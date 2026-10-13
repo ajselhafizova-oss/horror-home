@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DETENTION: Horror Home</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; background:#0a0a0f; color:#ddd; font-family:'Courier New',monospace; overflow:hidden; user-select:none; }
+  #game { width:100vw; height:100vh; display:flex; flex-direction:column; padding:12px; background:radial-gradient(circle at 50% 30%, #1a1a25 0%, #000 100%); }
+  .screen { display:none; flex-direction:column; flex:1; }
+  .screen.active { display:flex; }
+
+  /* ПРОЛОГ */
+  #screen-intro { align-items:center; justify-content:center; text-align:center; padding:30px; }
+  #screen-intro h1 { color:#900; font-size:38px; margin-bottom:20px; text-shadow:0 0 40px #900; letter-spacing:5px; }
+  #screen-intro p { color:#aaa; font-size:16px; line-height:1.7; margin-bottom:30px; max-width:500px; }
+  #screen-intro .house { font-size:80px; margin-bottom:20px; animation:pulse 2s infinite; }
+  #screen-intro button { background:#900; color:#fff; border:2px solid #f00; padding:16px 40px; font-size:20px; border-radius:8px; font-family:inherit; font-weight:bold; letter-spacing:2px; box-shadow:0 0 40px #900; cursor:pointer; }
+
+  /* АЛИЯ */
+  #screen-aliya { align-items:center; justify-content:center; text-align:center; padding:30px; }
+  #aliya-shadow {
+    width:180px; height:280px;
+    background:radial-gradient(ellipse at 50% 30%, #1a1a1a 0%, #000 70%);
+    border-radius:50% 50% 30% 30% / 40% 40% 20% 20%;
+    box-shadow:0 0 60px rgba(150,0,0,0.4);
+    margin-bottom:20px;
+    position:relative;
+    animation:float 3s ease-in-out infinite;
+  }
+  #aliya-shadow::before {
+    content:"";
+    position:absolute;
+    top:-30px; left:50%;
+    transform:translateX(-50%);
+    width:90px; height:90px;
+    background:#000;
+    border-radius:50%;
+    box-shadow:0 0 30px rgba(150,0,0,0.5);
+  }
+  #screen-aliya h2 { color:#c00; font-size:28px; margin-bottom:10px; letter-spacing:3px; }
+  #screen-aliya p { color:#ccc; font-size:16px; line-height:1.6; margin-bottom:20px; max-width:450px; font-style:italic; }
+  #screen-aliya button { background:#500; color:#fff; border:2px solid #900; padding:14px 35px; font-size:18px; border-radius:6px; font-family:inherit; font-weight:bold; cursor:pointer; }
+
+  /* ЭТАЖ */
+  #screen-floor { padding:10px; }
+  .floor-header { text-align:center; color:#a0a070; font-size:14px; margin-bottom:8px; }
+  .floor-title { text-align:center; color:#e8e8e8; font-size:18px; margin-bottom:10px; }
+  .ghost-area { text-align:center; margin-bottom:10px; }
+  .ghost-area img { max-width:140px; max-height:140px; animation:float 2s ease-in-out infinite; filter:drop-shadow(0 0 20px #900); }
+  .ghost-fallback { font-size:80px; animation:float 2s ease-in-out infinite; }
+  .doors { display:flex; justify-content:center; gap:12px; margin:15px 0; flex-wrap:wrap; }
+  .door {
+    width:80px; height:130px;
+    background:linear-gradient(180deg, #4a3820 0%, #2a1810 100%);
+    border:3px solid #8a6a40;
+    border-radius:8px 8px 0 0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; position:relative;
+    transition:transform 0.2s;
+    color:#d0a070; font-size:32px;
+  }
+  .door:hover { transform:scale(1.05); }
+  .door:active { transform:scale(0.95); }
+  .door .num { position:absolute; bottom:8px; font-size:14px; color:#a08060; }
+  .door::before {
+    content:"";
+    position:absolute;
+    top:50%; right:8px;
+    width:8px; height:8px;
+    background:#f0c060;
+    border-radius:50%;
+    transform:translateY(-50%);
+  }
+  .door.opened { background:#0a0a0a; border-color:#300; }
+  .door.wrong { animation:shake 0.3s; }
+
+  /* ВОПРОС */
+  #question-area { display:none; flex-direction:column; flex:1; }
+  #question-area.active { display:flex; }
+  .question-board {
+    background:#0d1f12;
+    border:5px solid #4a3820;
+    border-radius:8px;
+    padding:14px;
+    margin-bottom:10px;
+    box-shadow:inset 0 0 30px rgba(0,0,0,0.9);
+  }
+  .question-counter { color:#a0a070; font-size:12px; margin-bottom:6px; }
+  .question-text { color:#e8e8e8; font-size:16px; line-height:1.4; }
+  #input-area { background:#000; border:3px solid #444; color:#fff; font-size:20px; padding:8px; margin-bottom:8px; min-height:42px; border-radius:6px; word-break:break-all; }
+  #input-area::after { content:"▌"; animation:blink 0.7s infinite; color:#0f0; }
+  @keyframes blink { 50% { opacity:0; } }
+  #keyboard { display:flex; flex-direction:column; gap:4px; margin-top:auto; padding-bottom:4px; }
+  .kb-row { display:flex; justify-content:center; gap:3px; }
+  .key { background:#2a2a35; border:1px solid #444; color:#ddd; font-family:inherit; font-size:14px; font-weight:bold; padding:9px 0; border-radius:5px; flex:1; max-width:34px; cursor:pointer; touch-action:manipulation; }
+  .key:active { background:#900; }
+  .key.wide { max-width:70px; font-size:11px; }
+  .key.enter { background:#060; }
+  .key.delete { background:#600; }
+
+  /* ПРОГРЕСС */
+  .progress { display:flex; gap:4px; justify-content:center; margin-top:6px; }
+  .progress .dot { width:10px; height:10px; border-radius:50%; background:#333; }
+  .progress .dot.done { background:#0a0; }
+  .progress .dot.current { background:#fa0; }
+
+  /* КРЫША */
+  #screen-roof { align-items:center; justify-content:center; text-align:center; padding:30px; }
+  #arkadiy-img { max-width:200px; max-height:280px; margin-bottom:15px; animation:float 2s ease-in-out infinite; filter:drop-shadow(0 0 30px #f00); }
+  #arkadiy-fallback { font-size:100px; margin-bottom:15px; animation:float 2s infinite; }
+  #screen-roof h2 { color:#f00; font-size:26px; margin-bottom:15px; text-shadow:0 0 20px #f00; }
+  #screen-roof p { color:#ddd; font-size:17px; line-height:1.6; margin-bottom:20px; max-width:450px; }
+  #screen-roof button { background:#060; color:#fff; border:2px solid #0a0; padding:14px 40px; font-size:18px; border-radius:6px; font-family:inherit; font-weight:bold; cursor:pointer; }
+
+  /* СКРИМЕР */
+  #screamer { display:none; position:fixed; inset:0; background:#000; z-index:9999; align-items:center; justify-content:center; animation:shake 0.04s infinite; }
+  #screamer.active { display:flex; }
+  #screamer img { width:100%; height:100%; object-fit:cover; filter:contrast(1.5) saturate(1.5); }
+  #screamer .fallback { font-size:120px; animation:pulse 0.15s infinite; filter:drop-shadow(0 0 40px #f00); }
+  #screamer-text { position:absolute; bottom:10%; width:100%; text-align:center; color:#f00; font-size:32px; font-weight:bold; text-shadow:0 0 20px #f00; animation:pulse 0.2s infinite; letter-spacing:3px; }
+
+  @keyframes shake { 0%{transform:translate(0,0);} 25%{transform:translate(-12px,8px);} 50%{transform:translate(10px,-10px);} 75%{transform:translate(-8px,12px);} 100%{transform:translate(0,0);} }
+  @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+  @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+
+  #feedback { text-align:center; font-size:14px; min-height:20px; margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="game">
+
+  <!-- ПРОЛОГ -->
+  <div id="screen-intro" class="screen active">
+    <div class="house">🏚️</div>
+    <h1>DETENTION</h1>
+    <p><b>Ночь.</b><br>Ты стоишь перед заброшенным домом.<br>Дверь скрипит...</p>
+    <button onclick="enterHouse()">ВОЙТИ В ДОМ</button>
+  </div>
+
+  <!-- АЛИЯ -->
+  <div id="screen-aliya" class="screen">
+    <div id="aliya-shadow"></div>
+    <h2>АЛИЯ</h2>
+    <p>"Ты пришла. Хорошо.<br>На каждом этаже тебя ждут привидения.<br>Они задают вопросы по английскому.<br>Ошибаешься — они злятся.<br>Идём."</p>
+    <button onclick="startFloors()">ПОДНЯТЬСЯ НА 1 ЭТАЖ</button>
+  </div>
+
+  <!-- ЭТАЖ -->
+  <div id="screen-floor" class="screen">
+    <div class="floor-header" id="floor-header">ЭТАЖ 1 / 5</div>
+    <div class="floor-title" id="floor-title">Present Simple</div>
+    <div class="ghost-area" id="ghost-area"></div>
+
+    <div id="doors-area">
+      <div style="text-align:center; color:#ccc; font-size:13px; margin-bottom:8px;">Выбери дверь:</div>
+      <div class="doors" id="doors"></div>
+      <div style="text-align:center; color:#777; font-size:12px;" id="doors-hint">За одной из них — путь наверх</div>
+    </div>
+
+    <div id="question-area">
+      <div class="question-board">
+        <div class="question-counter" id="q-counter">Вопрос 1 / 3</div>
+        <div class="question-text" id="q-text">...</div>
+      </div>
+      <div id="input-area"></div>
+      <div id="feedback"></div>
+      <div id="keyboard"></div>
+    </div>
+  </div>
+
+  <!-- КРЫША -->
+  <div id="screen-roof" class="screen">
+    <div id="arkadiy-img"></div>
+    <h2>АРКАДИЙ ПАРОВОЗОВ</h2>
+    <p>"Я вас спасу! Держитесь!"</p>
+    <div style="font-size:40px; margin:15px 0;">🚂🚂🚂</div>
+    <p style="color:#0f0; font-size:20px; font-weight:bold;">🎉 ТЫ СПАСЁН! 🎉</p>
+    <button onclick="location.reload()">ИГРАТЬ СНОВА</button>
+  </div>
+
+</div>
+
+<!-- СКРИМЕР -->
+<div id="screamer">
+  <div id="screamer-content"></div>
+  <div id="screamer-text">SHE IS HERE</div>
+</div>
+
+<script>
+// ========== НАСТРОЙКИ ==========
+const GHOST_IMG = "ghost.png";       // ← имя картинки привидения
+const ARKADIY_IMG = "arkadiy.png";   // ← имя картинки Аркадия
+
+// ========== ДАННЫЕ ==========
+const FLOORS = [
+  {
+    title: "Present Simple",
+    ghostName: "Привидение-старушка",
+    questions: [
+      {q:"She ___ (go) to school every day.", a:"goes"},
+      {q:"They ___ (play) football on Sundays.", a:"play"},
+      {q:"He ___ (not / like) coffee.", a:"doesn't like"},
+      {q:"I ___ (be) a student.", a:"am"},
+      {q:"We ___ (have) two cats.", a:"have"},
+      {q:"My sister ___ (watch) TV every evening.", a:"watches"},
+    ]
+  },
+  {
+    title: "Past Simple",
+    ghostName: "Привидение-ребёнок",
+    questions: [
+      {q:"Yesterday I ___ (go) to school.", a:"went"},
+      {q:"She ___ (buy) a new book last week.", a:"bought"},
+      {q:"They ___ (see) a film yesterday.", a:"saw"},
+      {q:"He ___ (not / eat) breakfast.", a:"didn't eat"},
+      {q:"We ___ (be) at home.", a:"were"},
+      {q:"I ___ (have) a dog when I was 5.", a:"had"},
+    ]
+  },
+  {
+    title: "Артикли (a / an / the)",
+    ghostName: "Привидение-дворецкий",
+    questions: [
+      {q:"I saw ___ elephant at the zoo.", a:"an"},
+      {q:"This is ___ best day of my life.", a:"the"},
+      {q:"She has ___ cat.", a:"a"},
+      {q:"___ sun rises in the east.", a:"the"},
+      {q:"I want ___ apple.", a:"an"},
+      {q:"He is ___ doctor.", a:"a"},
+    ]
+  },
+  {
+    title: "Present Perfect",
+    ghostName: "Привидение-дама",
+    questions: [
+      {q:"I ___ never ___ (be) to London. (два слова)", a:"have been"},
+      {q:"She ___ (finish) her homework.", a:"has finished"},
+      {q:"They ___ (live) here for 10 years.", a:"have lived"},
+      {q:"He ___ (not / see) this film yet.", a:"hasn't seen"},
+      {q:"We ___ (already / eat).", a:"have already eaten"},
+      {q:"___ you ever ___ (try) sushi? (два слова)", a:"have tried"},
+    ]
+  },
+  {
+    title: "Модальные глаголы",
+    ghostName: "Привидение-страж",
+    questions: [
+      {q:"You ___ (must) stop at red light.", a:"must"},
+      {q:"I ___ (can) swim very well.", a:"can"},
+      {q:"She ___ (should) study more.", a:"should"},
+      {q:"You ___ (not / must) smoke here.", a:"must not"},
+      {q:"___ I open the window? (можно?)", a:"may"},
+      {q:"He ___ (can / not) come yesterday.", a:"could not"},
+    ]
+  }
+];
+
+const QUESTIONS_PER_FLOOR = 3;
+const SCREAMER_TEXTS = ["SHE IS HERE","BEHIND YOU","DON'T TURN","YOU ARE NEXT","SHE KNOWS","RUN","ERROR"];
+const WHISPERS = ["Свет мигает...","Шёпот за спиной...","Дверь скрипнула...","Привидение улыбнулось шире...","Что-то упало...","Часы остановились..."];
+
+// ========== СОСТОЯНИЕ ==========
+let currentFloor = 0;
+let currentQuestionInFloor = 0;
+let usedQuestions = [];
+let userInput = "";
+let correctDoor = 0;
+let currentQuestion = null;
+let questionsAnswered = []; // список правильных ответов
+
+// ========== ЭКРАНЫ ==========
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function enterHouse() {
+  showScreen('screen-aliya');
+}
+
+function startFloors() {
+  currentFloor = 0;
+  questionsAnswered = [];
+  showScreen('screen-floor');
+  loadFloor();
+}
+
+// ========== ЗАГРУЗКА ЭТАЖА ==========
+function loadFloor() {
+  const floor = FLOORS[currentFloor];
+  document.getElementById('floor-header').textContent = `ЭТАЖ ${currentFloor + 1} / 5`;
+  document.getElementById('floor-title').textContent = floor.title;
+
+  // Привидение
+  const ghostArea = document.getElementById('ghost-area');
+  ghostArea.innerHTML = `<img src="${GHOST_IMG}" alt="ghost" onerror="this.outerHTML='<div class=&quot;ghost-fallback&quot;>👻</div>'">`;
+
+  // Случайная правильная дверь (0,1,2)
+  correctDoor = Math.floor(Math.random() * 3);
+
+  // Сброс
+  currentQuestionInFloor = 0;
+  usedQuestions = [];
+  userInput = "";
+  currentQuestion = null;
+
+  // Показываем двери
+  document.getElementById('doors-area').style.display = 'block';
+  document.getElementById('question-area').classList.remove('active');
+  document.getElementById('feedback').textContent = '';
+  renderDoors();
+}
+
+function renderDoors() {
+  const doorsEl = document.getElementById('doors');
+  doorsEl.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const d = document.createElement('div');
+    d.className = 'door';
+    d.innerHTML = `🚪<div class="num">${i+1}</div>`;
+    d.onclick = () => pickDoor(i);
+    doorsEl.appendChild(d);
+  }
+}
+
+// ========== ВЫБОР ДВЕРИ ==========
+function pickDoor(index) {
+  if (index === correctDoor) {
+    // Правильная дверь — переход наверх
+    const doorsEl = document.querySelectorAll('.door')[index];
+    doorsEl.classList.add('opened');
+    document.getElementById('doors-hint').textContent = "✅ Дверь открыта! Идём наверх...";
+    document.getElementById('doors-hint').style.color = '#0f0';
+    setTimeout(() => {
+      currentFloor++;
+      if (currentFloor >= FLOORS.length) {
+        showScreen('screen-roof');
+        loadArkadiy();
+      } else {
+        loadFloor();
+      }
+    }, 1200);
+  } else {
+    // Неправильная — привидение задаёт вопрос
+    document.getElementById('doors-area').style.display = 'none';
+    document.getElementById('question-area').classList.add('active');
+    askQuestion();
+  }
+}
+
+// ========== ВОПРОСЫ ==========
+function askQuestion() {
+  const floor = FLOORS[currentFloor];
+
+  // Если уже использовали все — начать заново (или дать запасной)
+  if (usedQuestions.length >= floor.questions.length) {
+    usedQuestions = [];
+  }
+
+  // Случайный вопрос, ещё не использованный
+  let available = floor.questions.filter((_, i) => !usedQuestions.includes(i));
+  if (available.length === 0) {
+    usedQuestions = [];
+    available = floor.questions;
+  }
+  const qIndex = Math.floor(Math.random() * available.length);
+  const realIndex = floor.questions.indexOf(available[qIndex]);
+  usedQuestions.push(realIndex);
+  currentQuestion = available[qIndex];
+
+  document.getElementById('q-counter').textContent = `Вопрос ${currentQuestionInFloor + 1} / ${QUESTIONS_PER_FLOOR}`;
+  document.getElementById('q-text').textContent = currentQuestion.q;
+  userInput = "";
+  updateInput();
+  document.getElementById('feedback').textContent = '';
+}
+
+// ========== КЛАВИАТУРА ==========
+function buildKeyboard() {
+  const rows = ["QWERTYUIOP".split(''), "ASDFGHJKL".split(''), "ZXCVBNM".split('')];
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  rows.forEach(row => {
+    const r = document.createElement('div');
+    r.className = 'kb-row';
+    row.forEach(letter => {
+      const btn = document.createElement('button');
+      btn.className = 'key';
+      btn.textContent = letter;
+      btn.onclick = () => { if (userInput.length < 30) { userInput += letter.toLowerCase(); updateInput(); } };
+      r.appendChild(btn);
+    });
+    kb.appendChild(r);
+  });
+  const lastRow = document.createElement('div');
+  lastRow.className = 'kb-row';
+  const del = document.createElement('button');
+  del.className = 'key wide delete';
+  del.textContent = 'DEL';
+  del.onclick = () => { userInput = userInput.slice(0, -1); updateInput(); };
+  lastRow.appendChild(del);
+  const space = document.createElement('button');
+  space.className = 'key wide';
+  space.textContent = 'SPACE';
+  space.onclick = () => { if (userInput.length < 30) { userInput += ' '; updateInput(); } };
+  lastRow.appendChild(space);
+  const ent = document.createElement('button');
+  ent.className = 'key wide enter';
+  ent.textContent = 'ENTER';
+  ent.onclick = checkAnswer;
+  lastRow.appendChild(ent);
+  kb.appendChild(lastRow);
+}
+
+function updateInput() {
+  document.getElementById('input-area').textContent = userInput;
+}
+
+// ========== ПРОВЕРКА ОТВЕТА ==========
+function checkAnswer() {
+  if (!userInput || !currentQuestion) return;
+  const correct = currentQuestion.a.toLowerCase().trim();
+  const user = userInput.toLowerCase().trim();
+
+  if (user === correct) {
+    document.getElementById('feedback').style.color = '#6f6';
+    document.getElementById('feedback').textContent = '✅ Правильно! Привидение отступает.';
+    currentQuestionInFloor++;
+
+    if (currentQuestionInFloor >= QUESTIONS_PER_FLOOR) {
+      // Этаж пройден
+      setTimeout(() => {
+        document.getElementById('doors-area').style.display = 'block';
+        document.getElementById('question-area').classList.remove('active');
+        document.getElementById('doors-hint').textContent = '✅ Все вопросы отвечены! Теперь выбери правильную дверь →';
+        document.getElementById('doors-hint').style.color = '#0f0';
+        renderDoors();
+      }, 1200);
+    } else {
+      setTimeout(askQuestion, 1200);
+    }
+  } else {
+    // Ошибка
+    document.getElementById('feedback').style.color = '#f44';
+    document.getElementById('feedback').textContent = `❌ Неправильно. Ответ: ${currentQuestion.a}`;
+    showScreamer();
+    // Меняем вопрос (вариант В)
+    setTimeout(() => {
+      askQuestion();
+    }, 1500);
+  }
+}
+
+// ========== СКРИМЕР ==========
+function showScreamer() {
+  const screamer = document.getElementById('screamer');
+  const content = document.getElementById('screamer-content');
+  content.innerHTML = `<img src="${GHOST_IMG}" alt="screamer" onerror="this.outerHTML='<div class=&quot;fallback&quot;>👻</div>'">`;
+  document.getElementById('screamer-text').textContent = SCREAMER_TEXTS[Math.floor(Math.random() * SCREAMER_TEXTS.length)];
+  screamer.classList.add('active');
+  playScreamSound();
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
+  setTimeout(() => screamer.classList.remove('active'), 1200);
+}
+
+function playScreamSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(900, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.9);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.9);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.9);
+  } catch(e) {}
+}
+
+// ========== КРЫША ==========
+function loadArkadiy() {
+  const el = document.getElementById('arkadiy-img');
+  el.innerHTML = `<img src="${ARKADIY_IMG}" alt="Arkadiy" style="max-width:200px;max-height:280px;" onerror="this.outerHTML='<div style=&quot;font-size:100px&quot;>🚂</div>'">`;
+}
+
+// ========== СТАРТ ==========
+buildKeyboard();
+</script>
+</body>
+    </html>
